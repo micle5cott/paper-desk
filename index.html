@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paper Desk · Solana meme paper trading</title>
+<meta name="robots" content="noindex">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0b0e14;--panel:#121722;--panel2:#171d2b;--line:#232b3d;--text:#e6e9ef;--mut:#8b93a7;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--blue:#60a5fa;--violet:#a78bfa}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:14px}
+h1{font-size:20px;margin:0;letter-spacing:.2px}h1 small{color:var(--mut);font-weight:500;font-size:13px;margin-left:6px}
+h2{font-size:15px;margin:0 0 10px;color:#cfd5e3;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:var(--panel2);border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+.pill.paper{color:var(--amber);border-color:#5a4210}.pill.ok{color:var(--green);border-color:#164a2a}.pill.bad{color:var(--red);border-color:#5b1d1d}
+.stamp{color:var(--mut);font-size:12px}
+.stale{display:none;background:#3a1d0b;border:1px solid #7a3e10;color:#fdba74;padding:8px 12px;border-radius:10px;margin-bottom:12px}
+.grid{display:grid;gap:12px}.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi .l{color:var(--mut);font-size:12px}.kpi .v{font-size:22px;font-weight:650;margin-top:2px}.kpi .s{color:var(--mut);font-size:12px;margin-top:2px}
+.pos{color:var(--green)}.neg{color:var(--red)}.mut{color:var(--mut)}
+section{margin-top:12px}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;white-space:nowrap}
+th{color:var(--mut);font-weight:600;font-size:12px;position:sticky;top:0;background:var(--panel)}
+td.wrapc{white-space:normal;min-width:180px;max-width:340px;color:#c8cfdd}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.empty{color:var(--mut);padding:18px;text-align:center;border:1px dashed var(--line);border-radius:10px}
+.two{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.chartbox{position:relative;height:280px}
+.tog{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-left:auto}
+.tog button{background:none;border:0;color:var(--mut);padding:4px 10px;cursor:pointer;font-size:12px}.tog button.on{background:var(--panel2);color:var(--text)}
+.warn{color:var(--amber);font-size:12px}
+.tag{font-size:11px;padding:1px 6px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);color:#c3cad8}
+.tag.meta{color:var(--violet);border-color:#43347a}.tag.forming{color:var(--blue);border-color:#1f3d66}
+footer{color:var(--mut);font-size:12px;margin:20px 0 8px;line-height:1.6}
+@media (max-width:600px){.wrap{padding:10px}.kpi .v{font-size:19px}h1{font-size:18px}.chartbox{height:220px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Paper Desk <small>established Solana memes</small></h1>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span class="pill paper">PAPER ONLY · no real money</span>
+    <span id="gate" class="pill">…</span>
+    <span class="stamp" id="stamp">loading…</span>
+  </div>
+</header>
+<div class="stale" id="stale"></div>
+<div id="err" class="stale"></div>
+
+<div class="grid kpis" id="kpis"></div>
+
+<section class="card">
+  <h2>Equity vs just holding SOL <span class="tog" id="unit"><button data-u="sol" class="on">SOL</button><button data-u="usd">USD</button></span></h2>
+  <div class="chartbox"><canvas id="curve"></canvas></div>
+  <div class="mut" id="curvenote" style="font-size:12px;margin-top:6px"></div>
+</section>
+
+<section class="card"><h2>Open positions <span class="pill" id="poscount"></span></h2><div id="positions"></div></section>
+
+<section class="card"><h2>What's working <span class="warn" id="samplewarn"></span></h2>
+  <div class="grid kpis" id="wkpis"></div>
+  <div class="grid two" style="margin-top:12px" id="breakdowns"></div>
+</section>
+
+<section class="card"><h2>Closed trades <span class="pill" id="closedcount"></span></h2><div id="closed"></div></section>
+
+<div class="grid two">
+<section class="card"><h2>Latest scan: near-misses <span class="stamp" id="scanmeta"></span></h2><div id="near"></div><div id="seeds" style="margin-top:10px"></div></section>
+<section class="card"><h2>Top narratives (metas)</h2><div id="narr"></div></section>
+</div>
+
+<footer>
+Simulated trades only, nothing here is financial advice. Exits run every 5 min and the full scan every 15 min on an automated loop, with no AI in the loop. Costs are modeled honestly: 1% per side plus price impact, stops fill at the observed price, and open positions are marked at liquidation value.
+The verdict stays <b>"too early"</b> until there are 30+ closed trades. It's only "working" if it's net positive after costs <i>and</i> ahead of just holding SOL. All times are US Central.
+</footer>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num=(x,d=2)=>x==null||isNaN(x)?"–":Number(x).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=(x,d=2)=>x==null||isNaN(x)?"–":`<span class="${x>0?'pos':x<0?'neg':''}">${x>0?'+':''}${num(x,d)}%</span>`;
+const sol=(x,d=4)=>x==null||isNaN(x)?"–":`<span class="${x>0?'pos':x<0?'neg':''}">${x>0?'+':''}${num(x,d)}</span>`;
+const usd=x=>x==null?"–":"$"+num(x,2);
+const px=x=>{if(x==null)return"–";x=+x;return x>=1?"$"+num(x,4):"$"+x.toPrecision(4)};
+const big=x=>x==null?"–":x>=1e9?"$"+(x/1e9).toFixed(2)+"B":x>=1e6?"$"+(x/1e6).toFixed(1)+"M":x>=1e3?"$"+(x/1e3).toFixed(0)+"k":"$"+x;
+const tag=(s)=>!s||s==="-"||s==="none"?'<span class="mut">–</span>':`<span class="tag ${esc(s)}">${esc(s)}</span>`;
+const link=(u,t)=>u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`:esc(t);
+const table=(cols,rows,empty)=>!rows.length?`<div class="empty">${empty}</div>`:
+ `<div class="tw"><table><thead><tr>${cols.map(c=>`<th class="${c.n?'num':''}">${c.h}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td class="${c.n?'num':''}${c.w?' wrapc':''}">${c.f(r)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+let chart,unit="sol",D=null;
+document.querySelectorAll("#unit button").forEach(b=>b.onclick=()=>{unit=b.dataset.u;document.querySelectorAll("#unit button").forEach(x=>x.classList.toggle("on",x===b));drawCurve()});
+
+function drawCurve(){
+  if(!D)return;const c=D.curve||[];
+  const eq=c.map(r=>unit==="sol"?r.equity_sol:r.equity_usd), ho=c.map(r=>unit==="sol"?r.hodl_sol:r.hodl_usd);
+  $("curvenote").textContent=c.length<2?"The curve fills in as the loop logs equity (each 15-min scan plus every exit).":
+    unit==="sol"?"Measured in SOL, holding SOL is a flat 1.5 line. Above it means beating HODL.":"In USD, the HODL line moves with the SOL price.";
+  const data={labels:c.map(r=>r.t),datasets:[
+    {label:"Desk equity",data:eq,borderColor:"#22c55e",backgroundColor:"rgba(34,197,94,.08)",fill:true,tension:.2,pointRadius:c.length<30?2:0,borderWidth:2},
+    {label:"Just hold 1.5 SOL",data:ho,borderColor:"#8b93a7",borderDash:[5,4],pointRadius:0,borderWidth:1.5}]};
+  const opts={responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:"index",intersect:false},
+    plugins:{legend:{labels:{color:"#c8cfdd",boxWidth:12}}},
+    scales:{x:{ticks:{color:"#8b93a7",maxTicksLimit:8},grid:{color:"#1b2232"}},y:{ticks:{color:"#8b93a7"},grid:{color:"#1b2232"}}}};
+  if(typeof Chart==="undefined"){$("curvenote").textContent="The chart library didn't load. The data is still in the tables.";return}
+  if(chart){chart.data=data;chart.options=opts;chart.update()}else chart=new Chart($("curve"),{type:"line",data,options:opts});
+}
+
+function render(d){
+  D=d;const h=d.headline||{},w=d.working||{},o=w.overall||{};
+  const age=(Date.now()/1000-(d.generated_epoch||0))/60;
+  $("stamp").textContent=`Last updated ${h.as_of||d.generated||"?"} (${age<1?"just now":Math.round(age)+" min ago"})`;
+  const st=$("stale");if(age>15){st.style.display="block";st.textContent=`⚠ This data is ${Math.round(age)} minutes old. The loop or the push may be down. Last update: ${h.as_of||d.generated}.`}else st.style.display="none";
+  const g=h.entry_gate||{};$("gate").className="pill "+(h.paused?"bad":g.open?"ok":"bad");
+  $("gate").textContent=h.paused?"entries paused":g.open?"entries allowed":"entries blocked: "+(g.blocked_by||[]).join("; ");
+  const k=[
+    ["Equity",`${num(h.equity_sol,4)} SOL`,`${usd(h.equity_usd)} · start ${num(h.start_sol,2)} SOL`],
+    ["vs just holding SOL",pct(h.vs_start_sol_pct),"equity in SOL vs the 1.5 SOL start"],
+    ["vs start in USD",pct(h.vs_start_usd_pct),`start ${usd(h.start_usd)} · HODL now ${usd(h.hodl_usd)}`],
+    ["Realized P&L",`${sol(h.realized_sol)} SOL`,`costs paid ${num(h.costs_sol,4)} SOL`],
+    ["Cash / open",`${num(h.cash_sol,3)} SOL`,`${h.open_count||0} open position${h.open_count==1?"":"s"}`],
+    ["SOL price",usd(h.sol_usd),`${h.ticks||0} full scans so far`]];
+  $("kpis").innerHTML=k.map(([l,v,s])=>`<div class="card kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+  drawCurve();
+  const P=d.positions||[];$("poscount").textContent=P.length;
+  $("positions").innerHTML=table([
+    {h:"Coin",f:r=>link(r.url,r.symbol)},{h:"Opened",f:r=>esc(r.entry_time)},{h:"Size",n:1,f:r=>num(r.size_sol,3)+" SOL"},
+    {h:"Entry",n:1,f:r=>px(r.entry_price)},{h:"Last",n:1,f:r=>px(r.last_price)},{h:"P&L %",n:1,f:r=>pct(r.pnl_pct)},{h:"P&L SOL",n:1,f:r=>sol(r.pnl_sol)},
+    {h:"Stop",n:1,f:r=>px(r.stop)+(r.trailing?' <span class="tag">trailing</span>':"")},{h:"+100% target",n:1,f:r=>px(r.target)},
+    {h:"Narrative",f:r=>esc(r.narrative)+" "+tag(r.stage)},{h:"Setup",f:r=>esc(r.setup)},{h:"Thesis",w:1,f:r=>esc(r.thesis)}],P,
+    "No open positions. Being flat is a valid outcome when nothing passes every rule.");
+  $("samplewarn").textContent=(o.n||0)<(w.min_sample||30)?`${o.n||0}/${w.min_sample||30} closed trades: too early to judge`:"";
+  const wk=[["Closed trades",o.n||0,o.n?`${o.wins} W · ${o.losses} L`:"none yet"],["Win rate",o.n?num(o.win_rate,1)+"%":"–",""],
+    ["Avg win",pct(o.avg_win),""],["Avg loss",pct(o.avg_loss),""],["Expectancy / trade",pct(o.expectancy_pct),"after costs"],["Net P&L",o.n?sol(o.pnl_sol)+" SOL":"–",""]];
+  $("wkpis").innerHTML=wk.map(([l,v,s])=>`<div class="card kpi" style="background:var(--panel2)"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+  const bd=[["By narrative","by_narrative"],["By narrative stage","by_stage"],["By setup","by_setup"],["By exit reason","by_exit"],["By hold time","by_hold"]];
+  $("breakdowns").innerHTML=bd.map(([t,key])=>`<div><h2 style="font-size:13px">${t}</h2>${table([
+    {h:"Group",f:r=>esc(r.group)+(r.small?' <span class="warn" title="fewer than '+(w.small_bucket||10)+' trades">small n</span>':"")},
+    {h:"n",n:1,f:r=>r.n},{h:"Win %",n:1,f:r=>num(r.win_rate,0)},{h:"Avg W",n:1,f:r=>pct(r.avg_win,1)},{h:"Avg L",n:1,f:r=>pct(r.avg_loss,1)},
+    {h:"Exp.",n:1,f:r=>pct(r.expectancy_pct,1)},{h:"P&L SOL",n:1,f:r=>sol(r.pnl_sol)}],w[key]||[],"No closed trades yet")}</div>`).join("");
+  const C=(d.closed||[]).slice().reverse();$("closedcount").textContent=C.length;
+  $("closed").innerHTML=table([
+    {h:"Coin",f:r=>link(r.url,r.symbol)},{h:"Entry",f:r=>esc(r.entry_time)},{h:"Exit",f:r=>esc(r.exit_time)},{h:"Hold",n:1,f:r=>r.hold_h==null?"–":num(r.hold_h,1)+"h"},
+    {h:"Entry px",n:1,f:r=>px(r.entry_price)},{h:"Exit px",n:1,f:r=>px(r.exit_price)},{h:"P&L %",n:1,f:r=>pct(r.pnl_pct)},{h:"P&L SOL",n:1,f:r=>sol(r.pnl_sol)},
+    {h:"Narrative",f:r=>esc(r.narrative)+" "+tag(r.stage)},{h:"Setup",f:r=>esc(r.setup)},
+    {h:"Why entered",w:1,f:r=>esc(r.entry_reason)},{h:"Why exited",w:1,f:r=>esc(r.exit_reason)+(r.partial?' <span class="tag">partial TP earlier</span>':"")}],C,
+    "No closed trades yet. Every trade will show up here with its entry, exit, P&L after costs, and reasons.");
+  const sm=d.scan_meta||{};$("scanmeta").textContent=sm.time?`${sm.time} · ${sm.discovered??"?"} found, ${sm.passed??"?"} passed the basic filters`:"";
+  $("near").innerHTML=table([{h:"Coin",f:r=>link(r.url,r.symbol)},{h:"Status",f:r=>r.eligible?'<span class="pos">eligible</span>':'<span class="mut">rejected</span>'},
+    {h:"Score",n:1,f:r=>num(r.score,1)},{h:"24h",n:1,f:r=>pct(r.chg24,1)},{h:"MCap",n:1,f:r=>big(r.mcap)},{h:"Narrative",f:r=>esc(r.narrative||"–")+" "+tag(r.stage)},
+    {h:"Why",w:1,f:r=>esc(r.why)}],d.near_misses||[],"No coins made it past the basic filters in the last scan.");
+  const RS=d.rejected_seeds||[];
+  $("seeds").innerHTML=RS.length?`<div class="mut" style="font-size:12px">Well-known memes that failed the basic filters: ${RS.map(r=>`<b style="color:#c8cfdd">${esc(r.symbol)}</b> (${esc(r.why)})`).join(" · ")}</div>`:"";
+  $("narr").innerHTML=table([{h:"Theme",f:r=>esc(r.label)},{h:"Stage",f:r=>tag(r.stage)},{h:"Score",n:1,f:r=>num(r.score,0)},
+    {h:"Conc.",n:1,f:r=>r.concentration==null?"–":num(r.concentration*100,0)+"%"},{h:"Lead",f:r=>esc(r.lead)},{h:"Coins",w:1,f:r=>esc(r.coins)}],d.narratives||[],
+    "No narrative data from the last scan.");
+}
+async function load(){
+  try{const r=await fetch("data.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error("HTTP "+r.status);
+    render(await r.json());$("err").style.display="none";}
+  catch(e){$("err").style.display="block";$("err").textContent="Couldn't load data.json ("+e.message+"). Retrying every 60s.";}
+}
+load();setInterval(load,60000);
+setInterval(()=>{if(D){const a=(Date.now()/1000-(D.generated_epoch||0))/60;$("stamp").textContent=`Last updated ${D.headline?.as_of||D.generated} (${a<1?"just now":Math.round(a)+" min ago"})`;if(a>15){$("stale").style.display="block"}}},30000);
+</script>
+</body>
+</html>
